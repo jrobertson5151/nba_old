@@ -31,26 +31,34 @@ def get_teams(driver):
     teams_df = teams_df[~teams_df['Franchise'].str.contains('Franchise')]
     teams_df['franch_id'] = franch_ids
     teams_df = teams_df.set_index('franch_id', drop=False)
+    cols_as_series = teams_df.columns.to_series()
+    int_cols = list(cols_as_series.loc['From':'L']) +\
+               list(cols_as_series.loc['Plyfs':'Champ'])
+    teams_df = teams_df.astype({col:'int64' for col in int_cols})
+    teams_df = teams_df.astype({'W/L%':'float'})
     return teams_df
 
 def correct_team_url(franch_id, season):
-    if franch_id == 'BRK' and season <= 2011:
-        return 'NJN'
+    if franch_id == 'NJN' and season > 2012:
+        return 'BRK'
     elif franch_id == 'OKC' and season <= 2007:
         return 'SEA'
-    elif franch_id == 'CHO' and season in range(2004, 2014):
-        return 'CHA'
-    elif franch_id == 'CHO' and season <= 2003:
+    elif franch_id == 'CHA' and season >= 2014:
+        return 'CHO'
+    elif franch_id == 'CHA' and season <= 2003:
         return 'CHH'
     elif franch_id == 'MEM' and season <= 2000:
         return 'VAN'
-    elif franch_id == 'NOP' and season in [2005, 2006]:
+    elif franch_id == 'NOH' and season in [2005, 2006]:
         return 'NOK'
-    elif franch_id == 'NOP' and season <= 2004:
-        return 'NOH'
+    elif franch_id == 'NOH' and season >= 2013:
+        return 'NOP'
     elif franch_id == 'SAC' and season <= 1984:
         return 'KCK'
     elif franch_id == 'WAS' and season <= 1996:
         return 'WSB'
     else:
         return franch_id
+
+def get_start_date(franch_id):
+    pass

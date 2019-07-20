@@ -9,54 +9,104 @@ from nba_driver import *
 import numpy as np
 import string
 
-def get_player_df(soup, id_name):
+def get_player_soup(driver, player_id):
+    soup = get_soup(driver,
+                    'https://www.basketball-reference.com/players/' +
+                    player_id[0] + '/' + player_id + '.html')
+    for t in soup.find_all('tr', attrs={'class': 'over_header'}):
+        t.decompose()
+    return soup
+
+def get_player_df(soup, id_name, playoffs = False):
+    if playoffs:
+        id_name = 'playoffs_' + id_name
     table = soup.find('table', id=id_name)
-    df = pd.read_html(str(table))[0]
+    if table is None:
+        return None
+    df = pd.read_html(str(table))
+    if df is None:
+        return None
+    df = df[0]
     df = df[df['Season'].notna()]
     df = df[df['Season'].str.contains('-')]
+    filter_empty_columns = [col for col in df if col.startswith('Unnamed')]
+    df = df.drop(filter_empty_columns, axis=1)
     return df
-    
-def get_player_per_game(soup):
-    return get_player_df(soup, 'per_game')
 
-def get_player_per_36(soup):
-    return get_player_df(soup, 'per_minute')
+def get_player_totals(soup, playoffs = False):
+    return get_player_df(soup, 'totals', playoffs)
 
-def get_player_per_poss(soup):
-    return get_player_df(soup, 'per_poss')
+def get_player_per_game(soup, playoffs = False):
+    return get_player_df(soup, 'per_game', playoffs)
 
-def get_player_advanced(soup):
-    return get_player_df(soup, 'advanced')
+def get_player_per_36(soup, playoffs = False):
+    return get_player_df(soup, 'per_minute', playoffs)
 
-def get_player_shooting(soup):
-    table = soup.find('table', id='shooting')
-    fixed_table_string = '<table>' + str(table.tbody) + '</table>'
+def get_player_per_poss(soup, playoffs = False):
+    return get_player_df(soup, 'per_poss', playoffs)
+
+def get_player_advanced(soup, playoffs = False):
+    return get_player_df(soup, 'advanced', playoffs)
+
+def get_player_shooting(soup, playoffs = False):
+    if playoffs:
+        table = soup.find('table', id='playoffs_shooting')
+    else:
+        table = soup.find('table', id='shooting')
+    if table is None:
+        return None
+    df = get_player_df(soup, 'shooting', playoffs)
+    if df is None:
+        return None
     cols = ['Season', 'Age', 'Tm', 'Lg', 'Pos', 'G', 'MP', 'FG%', 'Dist.',
             '% of 2PA', '% of 0-3', '% of 3-10', '% of 10-16', '% of 16-3pt', '% of 3P',
             '2P %FG', '0-3 %FG', '3-10 %FG', '10-16 %FG', '16-3pt%FG',
             '3P %FG', '2P % Assisted', '% of Dunks', 'Dunks Made',
             '3P % Assisted', '% of 3PA from Corner', 'Corner 3 %FG ',
             'Heaves Attempted', 'Heaves Made']
-    df = pd.read_html(fixed_table_string)[0]
     df.columns = cols
     return df
+
+def get_player_pbp(soup, playoffs = False):
+    table = get_player_df(soup, 'pbp', playoffs)
+    if table is None:
+        return None
+    return table.fillna(value = 0)         #position% is na for unplayed positions
+
+def get_player_highs(soup, playoffs = False):
+    id_name = 'year-and-career-highs'
+    if playoffs:
+        id_name += '-po'
+    return get_player_df(soup, id_name)
 
 def get_player_id_list(driver):
     def by_letter(letter):
         url = 'https://www.basketball-reference.com/players/' + letter +'/'
         player_page_soup = get_soup(driver, url)
         ths = player_page_soup.find_all('th', attrs={'data-append-csv': True})
-        return [(t['data-append-csv'], int(t.parent.td.text))
-                for t in ths if t.parent.td is not None]
-    rtn = []
+        player_pairs = pd.DataFrame([(t['data-append-csv'], t.text)
+                                     for t in ths if t.parent.td is not None],
+                                    columns = ['player_id', 'Player'])
+        if letter == 'n':
+            player_table = pd.read_html(str(player_page_soup('table')[1]), parse_dates = True)[0]
+        else:
+            player_table = pd.read_html(str(player_page_soup.table))[0]
+        player_table = player_table[player_table.Player != 'Player']
+        player_table.index = player_pairs.index
+        player_table = player_table.join(player_pairs, how='inner', rsuffix='2')
+        player_table.set_index('player_id', inplace = True, drop=False)
+        player_table.drop('Player2', axis=1, inplace=True)
+        player_table = player_table.astype({'From':'int64','To':'int64', 'Wt': 'float64'})
+        return player_table
+    rtn = None
     for l in string.ascii_lowercase:
-        rtn.append(by_letter(l))
         print('getting ' + l)
+        if l != 'x':
+            rtn = pd.concat([rtn, by_letter(l)])
         time.sleep(1)
     return rtn
-                                                                            
-    
-def get_bio(soup):
+                                                                                
+def get_player_bio(soup, playoffs=False):
     bio = dict()
     bio_div = soup.find('div', itemtype="https://schema.org/Person")
     bio_p = bio_div.find_all('p')
@@ -106,7 +156,8 @@ def get_bio(soup):
         bio['age_at_death'] = bio['date_of_death']-bio['date_of_birth']
     else:
         bio['age'] = datetime.now() - bio['date_of_birth']
-    return bio
+    bio_series = pd.Series(bio)
+    return pd.DataFrame(data=[list(bio_series)], columns=list(bio_series.index))
     
 
 
