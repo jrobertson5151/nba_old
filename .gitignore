@@ -2,3 +2,4 @@
 test.py
 chromedriver
 __pycache__
+**/Data

@@ -15,15 +15,21 @@ def get_player_ids(table):
 
 def get_season_table(season_soup, id_name):
     table = season_soup.find('table', id =id_name)
-    df = pd.read_html(str(table))[0]
+    try:
+        df = pd.read_html(str(table))[0]
+    except:
+        return None
     df['player_id'] = get_player_ids(table)
     df = df.set_index('player_id', drop = False)
     return df    
     
 def get_team_roster(season_soup):
     table = season_soup.find('table', id='roster')
-    df = pd.read_html(str(table))[0]
-    '''player_ids = []
+    try:
+        df = pd.read_html(str(table))[0]
+    except:
+        return None
+        '''player_ids = []
     for td in table.find_all('td', attrs={'data-stat': 'player'}):
         player_ids.append(td['data-append-csv'])'''
     df['player_id'] = get_player_ids(table)
@@ -32,21 +38,30 @@ def get_team_roster(season_soup):
     return df
 
 def get_team_season_info(season_soup):
-    table = season_soup.find('table', id='team_misc')
-    table.find('tr', attrs={'class': 'over_header'}).decompose()
-    rtn = pd.read_html(str(table))[0]
-    rtn.name = None
-    return rtn
+    try:
+        table = season_soup.find('table', id='team_misc')
+        table.find('tr', attrs={'class': 'over_header'}).decompose()
+        rtn = pd.read_html(str(table))[0]
+        rtn.name = None
+        return rtn
+    except:
+        return None
 
 def get_team_per_game(season_soup):
-    df = get_season_table(season_soup, 'per_game')
-    return df
+    try:
+        df = get_season_table(season_soup, 'per_game')
+        return df
+    except:
+        return None
 
 def get_team_totals(season_soup):
-    for tag in season_soup.find_all('tr', attrs={'class':'stat_average'}):
-        tag.decompose()
-    df = get_season_table(season_soup, 'totals')
-    return df
+    try:
+        for tag in season_soup.find_all('tr', attrs={'class':'stat_average'}):
+            tag.decompose()
+        df = get_season_table(season_soup, 'totals')
+        return df
+    except:
+        return None
 
 def get_team_per_min(season_soup):
     df = get_season_table(season_soup, 'per_minute')
@@ -70,6 +85,8 @@ def get_team_schedule(driver, franch_id, season):
                           'https://www.basketball-reference.com/teams/' +
                           correct_id + '/' + str(season+1) + '_games.html')
     [t.decompose() for t in sched_soup.find_all('tr', attrs={'class':'thead'})]
+    game_ids = [str.split(td.a['href'], '/')[2][:-5] for td in
+                sched_soup.find_all('td', attrs={'data-stat': 'box_score_text'})]
     sched_df = pd.read_html(str(sched_soup))[0]
     sched_df = sched_df.set_index('G', drop=False)
     sched_df['Win'] = [True if x == 'W' else False for x in sched_df['Unnamed: 7']]
@@ -79,6 +96,7 @@ def get_team_schedule(driver, franch_id, season):
     filter_empty_columns = [col for col in sched_df if
                             col.startswith('Unnamed') or col == 'Notes']
     sched_df = sched_df.drop(filter_empty_columns, axis=1)
+    sched_df['game_id'] = game_ids
     #get franch_id for opponent
     #box scores
     #playoffs

@@ -71,7 +71,11 @@ def get_player_pbp(soup, playoffs = False):
     table = get_player_df(soup, 'pbp', playoffs)
     if table is None:
         return None
-    return table.fillna(value = 0)         #position% is na for unplayed positions
+    table = table.fillna(value = 0)         #position% is na for unplayed positions
+    for c in ['PG%', 'SG%', 'SF%', 'PF%', 'C%']:
+        table[c] = [int(x[:-1]) if x != 0 else 0 for x in table[c]]
+    return table
+    
 
 def get_player_highs(soup, playoffs = False):
     id_name = 'year-and-career-highs'
@@ -125,13 +129,22 @@ def get_player_bio(soup, playoffs=False):
                 bio['height_cm'] = int(match.group(4))
                 bio['weight_kg'] = int(match.group(5))
         elif 'Born' in p_text:
-            bio['date_of_birth'] = datetime.strptime(p.span['data-birth'], "%Y-%m-%d")
+            try:
+                bio['date_of_birth'] = datetime.strptime(
+                    p.span['data-birth'], "%Y-%m-%d")
+            except:
+                pass
         elif 'Died' in p_text:
-            bio['date_of_death'] = datetime.strptime(p.span['data-death'], "%Y-%m-%d")
+            try:
+                bio['date_of_death'] = datetime.strptime(p.span['data-death'], "%Y-%m-%d")
+            except:
+                pass
         elif 'Position' in p_text:
             p_split = re.split("▪|:", p_text)
-            bio['Position'] = p_split[1].strip()
-            bio['Shooting Hand'] = p_split[3].strip()
+            if len(p_split) > 1:
+                bio['Position'] = p_split[1].strip()
+            if len(p_split) > 3:
+                bio['Shooting Hand'] = p_split[3].strip()
         elif '▪' in p_text:
             bio['Full Name'] = p_text.split("▪")[0].strip()
         elif "High School" in p_text:
@@ -152,12 +165,12 @@ def get_player_bio(soup, playoffs=False):
             p_split = p_text.split(":")
             if len(p_split) == 2:
                 bio[p_split[0].strip()] = p_split[1].strip()
-    if 'date_of_death' in bio:
+    if 'date_of_death' in bio and 'date_of_birth' in bio:
         bio['age_at_death'] = bio['date_of_death']-bio['date_of_birth']
-    else:
+    elif 'date_of_birth' in bio:
         bio['age'] = datetime.now() - bio['date_of_birth']
     bio_series = pd.Series(bio)
     return pd.DataFrame(data=[list(bio_series)], columns=list(bio_series.index))
-    
 
-
+def get_player_salaries(soup, playoffs=None):
+    return get_player_df(soup, 'all_salaries')
