@@ -43,6 +43,8 @@ def get_team_season_info(season_soup):
         table.find('tr', attrs={'class': 'over_header'}).decompose()
         rtn = pd.read_html(str(table))[0]
         rtn.name = None
+        rtn.rename(columns={'EFG%.1': 'Opp EFG', 'TOV%.1': 'Opp TOV%',
+                            'FT/FGA.1': 'Opp FT/FGA'}, inplace = True)
         return rtn
     except:
         return None
@@ -102,4 +104,15 @@ def get_team_schedule(driver, franch_id, season):
     #playoffs
     return sched_df
 
-    
+def get_preseason_odds(driver, year):
+    url = 'https://www.basketball-reference.com/leagues/NBA_' + \
+          str(year+1) + '_preseason_odds.html'
+    odds_soup = get_soup(driver, url)
+    table_soup = odds_soup.find('table', id='NBA_preseason_odds')
+    table = pd.read_html(str(table_soup))[0]
+    table = table[table['Team'] != 'Team']
+    table.drop(list(table.filter(regex = 'Unnamed')), axis=1, inplace=True)
+    table['Odds'] = [float(x) for x in table['Odds']]
+    #find franch_ids when you have stored team_name_table
+    return table
+

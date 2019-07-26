@@ -31,6 +31,8 @@ def get_player_df(soup, id_name, playoffs = False):
     df = df[df['Season'].str.contains('-')]
     filter_empty_columns = [col for col in df if col.startswith('Unnamed')]
     df = df.drop(filter_empty_columns, axis=1)
+    if id_name != 'all_salaries' and 'Tm' in df.columns:
+        df = df[df['Tm'] != 'TOT']
     return df
 
 def get_player_totals(soup, playoffs = False):
@@ -65,6 +67,7 @@ def get_player_shooting(soup, playoffs = False):
             '3P % Assisted', '% of 3PA from Corner', 'Corner 3 %FG ',
             'Heaves Attempted', 'Heaves Made']
     df.columns = cols
+    df = df[df['Tm'] != 'TOT']
     return df
 
 def get_player_pbp(soup, playoffs = False):

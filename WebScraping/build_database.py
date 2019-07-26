@@ -7,15 +7,16 @@ import sys
 
 data_loc = '../Data/'
 
-def build_db(dest_name='store', from_year=1950):
+def build_db(dest_name='recent', from_year=1999):
     driver = driver_init()
     store = get_store(dest_name)
     try:
         store_seasons(driver, store, range(from_year, 2019))
         store_player_ids(driver, store)
         recent_ids = [x.player_id for (_, x) in store['player_list'].iterrows()
-                      if x.From > from_year]
+                      if x.From >= from_year]
         store_player_stats(driver, store, recent_ids)
+        store_preseason_odds(driver, store, range(from_year, 2019))
     except:
         traceback.print_exc(file=sys.stdout)
     finally:
@@ -41,6 +42,8 @@ def store_seasons(driver, store, years, force_update = False):
     for year in years:
         for f in store['team_list']['franch_id']:
             if store['team_list']['From'][f] > year:
+                continue
+            if f == 'CHA' and year in [2002, 2003, 2004]:
                 continue
             print('Getting ' + str(year) +  ' info for ' + f)
             stat_names = ['roster', 'season_info', 'per_game', 'totals',
@@ -91,5 +94,22 @@ def store_player_stats(driver, store, player_ids):
                     if table is not None:
                         store.append(table_loc, table)
         sleep(1)
+
+def lookup_id(store, team_name):
+    if team_name == 'New Orleans/Oklahoma City Hornets':
+        return 'NOH'
+    return store['team_name_table'].loc[team_name].franch_id
         
-        
+def store_preseason_odds(driver, store, years):
+    for y in years:
+        print('Storing odds for ' + str(y))
+        loc = '/season/year_'+str(y)+'/preseason_odds'
+        if loc not in store:
+            odds = get_preseason_odds(driver, y)
+            sleep(.5)
+            if 'team_name_table' in store:
+                odds['franch_id'] = [lookup_id(store, t) for t in odds['Team']]
+            store[loc] = odds
+        else:
+            print('Already have odds for ' + str(y))
+                                 
